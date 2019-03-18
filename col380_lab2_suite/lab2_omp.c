@@ -26,6 +26,7 @@ void revSort(int N, float* W, float* W_n){
 float** newMatrix(int M, int N){
 	float** W;
 	W = (float **)malloc(M*sizeof(float*));
+#pragma omp parallel for num_threads(4)
 	for(int i = 0; i < M; i++)
 	    W[i]= (float*)malloc(N*sizeof(float));
 	return W;
