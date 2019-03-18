@@ -71,6 +71,13 @@ void zeros(int M, int N, float** W){
 	}
 }
 
+void zerosLinear(int M, int N, float* W){
+#pragma omp parallel for num_threads(4)
+	for(int i = 0; i < M*N; i++){
+		W[i] = 0.0;
+	}
+}
+
 // copy M*N matrix
 void copyM(int M, int N, float** W, float** W_n){
 #pragma omp parallel for num_threads(4)
@@ -166,24 +173,51 @@ float nabs(float a){
 void QRfactors(int N, float** W, float** Q, float** R){
 
 	float** V = newMatrix(N, N);
-	copyM(N, N, W, V);
+	transpose(N, N, W, V);
 
 	for(int i = 0; i < N; i++){
 		R[i][i] = 0.0;
 		float norm = 0.0;
 		for(int k = 0; k < N; k++){
-			norm += V[k][i]*V[k][i];
+			norm += V[i][k]*V[i][k];
 		}
 		norm = sqrt(norm);
 		R[i][i] = norm;
+#pragma omp parallel for num_threads(2) schedule(static) shared(Q, V)
 		for(int k = 0; k < N; k++)
-			Q[k][i] = V[k][i]/R[i][i];
+			Q[k][i] = V[i][k]/norm;
+
 		for(int j = i+1; j < N; j++){
 			R[i][j] = 0.0;
 			for(int k = 0; k < N; k++)
-				R[i][j] += Q[k][i]*V[k][j];
+				R[i][j] += Q[k][i]*V[j][k];
 			for(int k = 0; k < N; k++)
-				V[k][j] = V[k][j] - R[i][j]*Q[k][i];
+				V[j][k] = V[j][k] - R[i][j]*Q[k][i];
+		}
+	}
+}
+
+void QRfactorsLinear(int N, float* W, float* Q, float* R){
+
+	float* V = (float*)malloc(N*N*sizeof(float));
+	copyLinearToLinear(N, N, W, V);
+
+	for(int i = 0; i < N; i++){
+		R[i*N + i] = 0.0;
+		float norm = 0.0;
+		for(int k = 0; k < N; k++){
+			norm += V[k*N + i]*V[k*N + i];
+		}
+		norm = sqrt(norm);
+		R[i*N + i] = norm;
+		for(int k = 0; k < N; k++)
+			Q[k*N + i] = V[k*N + i]/R[i*N + i];
+		for(int j = i+1; j < N; j++){
+			R[i*N + j] = 0.0;
+			for(int k = 0; k < N; k++)
+				R[i*N + j] += Q[k*N + i]*V[k*N + j];
+			for(int k = 0; k < N; k++)
+				V[k*N + j] = V[k*N + j] - R[i*N + j]*Q[k*N + i];
 		}
 	}
 }
@@ -228,6 +262,7 @@ void SVD(int M, int N, float* D, float** U, float** SIGMA, float** V_T)
 	/********* QR Algorithm *********/
 	/********************************/
 	float **D_i = newMatrix(N, N);	//N*N matrix
+	float **D_new = newMatrix(N, N);	//N*N matrix
 	float **E_i = newMatrix(N, N);  //N*N matrix
 	float **E_new = newMatrix(N, N);  //N*N matrix
 	float **Q = newMatrix(N, N);  //N*N matrix
@@ -247,27 +282,30 @@ void SVD(int M, int N, float* D, float** U, float** SIGMA, float** V_T)
 		iter_count++;
 		QRfactors(N, D_i, Q, R);
 
-		multiply(N, N, N, R, Q, D_i);
+		multiply(N, N, N, R, Q, D_new);
 		multiply(N, N, N, E_i, Q, E_new);
 
 		float maxDiff = 0.0;
+		float diff;
 		for(i = 0; i < N; i++){
-			for(j = 0; j < N; j++){
-				if(E_new[i][j] - E_i[i][j] > maxDiff)
-					maxDiff = nabs(E_new[i][j] - E_i[i][j]);
-				if(maxDiff > TOLERANCE)
-					break;
-			}
+			diff = nabs(D_new[i][i] - D_i[i][i]);	
+			if(diff > maxDiff)
+				maxDiff = diff;
 			if(maxDiff > TOLERANCE)
 				break;
 		}
-		if(maxDiff < TOLERANCE)
-			break;
+
+		//if(maxDiff < TOLERANCE)
+		//	break;
 
 		float** temp;
 		temp = E_new;
 		E_new = E_i;
 		E_i = temp;
+
+		temp = D_new;
+		D_new = D_i;
+		D_i = temp;
 		//printf("%d\n", iter_count);
 	}
 
@@ -328,8 +366,8 @@ void SVD(int M, int N, float* D, float** U, float** SIGMA, float** V_T)
 	float** U1 = newMatrix(M, M);
 	multiply(M, N, M, DV, sig_inv, U1);
 
-	printM(M, M, U1);
-	/*printM(M, N, sig);*/
+/*	printM(M, M, U1);
+	printM(M, N, sig);*/
 
 	for(i = 0; i < M; i++){
 		for(j = 0; j < M; j++){
@@ -347,7 +385,7 @@ void SVD(int M, int N, float* D, float** U, float** SIGMA, float** V_T)
 		SIGMA[0][i] = sig[i][i];
 	}
 
-	printf("SVD done\n\n");
+	//printf("SVD done\n\n");
 
 }
 
@@ -379,7 +417,7 @@ void PCA(int retention, int M, int N, float* D, float* U, float* SIGMA, float** 
 			break;
 	}   
 	K[0] = i + 1;
-	printf("%d\n", K[0]);
+	printf("K = %d\n\n", K[0]);
 	float** W = newMatrix(N, K[0]);
 	float** D_HAT1 = newMatrix(M, K[0]);
 	D_HAT[0] = (float*)malloc(sizeof(float)*M*K[0]);
