@@ -26,7 +26,7 @@ void revSort(int N, float* W, float* W_n){
 float** newMatrix(int M, int N){
 	float** W;
 	W = (float **)malloc(M*sizeof(float*));
-#pragma omp parallel for num_threads(4)
+#pragma omp parallel for //num_threads(4)
 	for(int i = 0; i < M; i++)
 	    W[i]= (float*)malloc(N*sizeof(float));
 	return W;
@@ -40,7 +40,7 @@ void freeMatrix(int M, int N, float** W){
 
 //initialise N*N matrix as identity
 void identity(int N, float** W){
-#pragma omp parallel for num_threads(4)
+#pragma omp parallel for //num_threads(4)
 	for(int i = 0; i < N; i++){
 		for(int j = 0; j < N; j++){
 			W[i][j] = 0.0;
@@ -52,7 +52,7 @@ void identity(int N, float** W){
 
 //initialise N*N matrix as identity
 void identityLinear(int N, float* W){
-#pragma omp parallel for num_threads(4)
+#pragma omp parallel for //num_threads(4)
 	for(int i = 0; i < N; i++){
 		for(int j = 0; j < N; j++){
 			W[i*N + j] = 0.0;
@@ -64,7 +64,7 @@ void identityLinear(int N, float* W){
 
 //initialise M*N matrix as zero
 void zeros(int M, int N, float** W){
-#pragma omp parallel for num_threads(4)
+#pragma omp parallel for //num_threads(4)
 	for(int i = 0; i < M; i++){
 		for(int j = 0; j < N; j++){
 			W[i][j] = 0.0;
@@ -73,7 +73,7 @@ void zeros(int M, int N, float** W){
 }
 
 void zerosLinear(int M, int N, float* W){
-#pragma omp parallel for num_threads(4)
+#pragma omp parallel for //num_threads(4)
 	for(int i = 0; i < M*N; i++){
 		W[i] = 0.0;
 	}
@@ -81,7 +81,7 @@ void zerosLinear(int M, int N, float* W){
 
 // copy M*N matrix
 void copyM(int M, int N, float** W, float** W_n){
-#pragma omp parallel for num_threads(4)
+#pragma omp parallel for //num_threads(4)
 	for(int i = 0; i < M; i++){
 		for(int j = 0; j < N; j++){
 			W_n[i][j] = W[i][j];
@@ -90,7 +90,7 @@ void copyM(int M, int N, float** W, float** W_n){
 }
 
 void copyMToLinear(int M, int N, float** W, float* W_n){
-#pragma omp parallel for num_threads(4)
+#pragma omp parallel for //num_threads(4)
 	for(int i = 0; i < M; i++){
 		for(int j = 0; j < N; j++){
 			W_n[i*N + j] = W[i][j];
@@ -99,7 +99,7 @@ void copyMToLinear(int M, int N, float** W, float* W_n){
 }
 
 void copyLinearToM(int M, int N, float* W, float** W_n){
-#pragma omp parallel for num_threads(4)
+#pragma omp parallel for //num_threads(4)
 	for(int i = 0; i < M; i++){
 		for(int j = 0; j < N; j++){
 			W_n[i][j] = W[i*N + j];
@@ -108,7 +108,7 @@ void copyLinearToM(int M, int N, float* W, float** W_n){
 }
 
 void copyLinearToLinear(int M, int N, float* W, float* W_n){
-#pragma omp parallel for num_threads(4)
+#pragma omp parallel for //num_threads(4)
 	for(int i = 0; i < M*N; i++){
 		W_n[i] = W[i];
 	}
@@ -127,7 +127,7 @@ void printM(int M, int N, float** W){
 
 // transpose of M*N matrix W
 void transpose(int M, int N, float** W, float** W_T){
-#pragma omp parallel for num_threads(4) schedule(static)
+#pragma omp parallel for //num_threads(4) schedule(static)
 	for(int i = 0; i < M; i++){
 		for(int j = 0; j < N; j++){
 			W_T[j][i] = W[i][j];
@@ -151,7 +151,7 @@ void multiply(int M, int N, int R, float** W1, float** W2, float** W_M){
 
 // multiple M*N matrix with N*R matrix in 1D array
 void multiplyLinear(int M, int N, int R, float* W1, float* W2, float* W_M){
-#pragma omp parallel for num_threads(4) schedule(static)
+#pragma omp parallel for //num_threads(4) schedule(static)
 	for(int i = 0; i < M; i++){
 		for(int j = 0; j < R; j++){
 			float sum = 0.0;
@@ -228,6 +228,7 @@ void QRfactorsLinear(int N, float* W, float* Q, float* R){
 // 		TODO -- You must implement this function
 // 	*****************************************************
 // */
+int iter_count;
 void SVD(int M, int N, float* D, float** U, float** SIGMA, float** V_T)
 {
 	int i,j,k,t;
@@ -240,15 +241,11 @@ void SVD(int M, int N, float* D, float** U, float** SIGMA, float** V_T)
 			D2[i][j] = D[i*N + j];
 	}
 
-	t = N;
-	N = M;
-	M = t;
+	/* No need for taking transpose, replace U by V, V by U, sigma by sigma^T in the final output */
 
 	float **D1;	//M*N matrix
 	D1 = newMatrix(M, N);
-	transpose(N, M, D2, D1);
-
-	/*printM(M, N, D1);*/
+	copyM(M, N, D2, D1);
 
 	float **D_T;	//N*M matrix
 	D_T = newMatrix(N, M);
@@ -274,9 +271,9 @@ void SVD(int M, int N, float* D, float** U, float** SIGMA, float** V_T)
 	zeros(N, N, Q);
 	zeros(N, N, R);
 
-	int CONG_LIMIT = 100;
-	float TOLERANCE = 0.0001;
-	int iter_count = 0;
+	int CONG_LIMIT = 10000;
+	float TOLERANCE = 0.000000001;
+	iter_count = 0;
 
 	while(iter_count < CONG_LIMIT){
 
@@ -288,16 +285,27 @@ void SVD(int M, int N, float* D, float** U, float** SIGMA, float** V_T)
 
 		float maxDiff = 0.0;
 		float diff;
-		for(i = 0; i < N; i++){
+		/*for(i = 0; i < N; i++){
 			diff = nabs(D_new[i][i] - D_i[i][i]);	
 			if(diff > maxDiff)
 				maxDiff = diff;
 			if(maxDiff > TOLERANCE)
 				break;
+		}*/
+		for(i = 0; i < N; i++){
+			for(j = 0; j < N; j++){
+				diff = E_new[i][j] - E_i[i][j];
+				if(diff > maxDiff)
+					maxDiff = diff;
+				if(maxDiff > TOLERANCE)
+					break;
+			}
+			if(maxDiff > TOLERANCE)
+				break;
 		}
 
-		//if(maxDiff < TOLERANCE)
-		//	break;
+		if(maxDiff < TOLERANCE)
+			break;
 
 		float** temp;
 		temp = E_new;
@@ -367,22 +375,19 @@ void SVD(int M, int N, float* D, float** U, float** SIGMA, float** V_T)
 	float** U1 = newMatrix(M, M);
 	multiply(M, N, M, DV, sig_inv, U1);
 
-/*	printM(M, M, U1);
-	printM(M, N, sig);*/
+	for(i = 0; i < N; i++){
+		for(j = 0; j < N; j++){
+			U[0][i*N + j] = V[i][j];
+		}
+	}
 
 	for(i = 0; i < M; i++){
 		for(j = 0; j < M; j++){
-			U[0][i*M + j] = U1[i][j];
+			V_T[0][i*M + j] = U1[j][i];
 		}
 	}
 
 	for(i = 0; i < N; i++){
-		for(j = 0; j < N; j++){
-			V_T[0][i*N + j] = V_T1[i][j];
-		}
-	}
-
-	for(i = 0; i < M; i++){
 		SIGMA[0][i] = sig[i][i];
 	}
 
@@ -429,11 +434,13 @@ void PCA(int retention, int M, int N, float* D, float* U, float* SIGMA, float** 
 		}
 	}
 
-	printM(N, K[0], W);
+	//printM(N, K[0], W);
 	
 	multiply(M, N, K[0], D2, W, D_HAT1);
 
 	printM(M, K[0], D_HAT1);
+
+	printf("\n\n%d\n", iter_count);
 
 	for(i = 0; i < M; i++){
 		for(j = 0; j < K[0]; j++){

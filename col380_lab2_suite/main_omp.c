@@ -4,6 +4,30 @@
 #include <stdlib.h>
 #include <omp.h>
 
+// multiple M*N matrix with N*R matrix in 1D array
+void multiplyL(int M, int N, int R, float* W1, float* W2, float* W_M){
+	for(int i = 0; i < M; i++){
+		for(int j = 0; j < R; j++){
+			float sum = 0.0;
+			for(int k = 0; k < N; k++){
+				sum += W1[i*N + k] * W2[k*R + j];
+			}
+			W_M[i*R + j] = sum;
+		}
+	}
+}
+
+void printM(int M, int N, float* W){
+	for(int i = 0; i < M; i++){
+		for(int j = 0; j < N; j++){
+			printf("%f ", W[i*N + j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+}
+
+
 /*
 	Arguments:
 		arg1: input filename (consist M, N and D)
@@ -62,6 +86,16 @@ int main(int argc, char const *argv[])
 	// 	*****************************************************
 	// */
 	SVD(M, N, D, &U, &SIGMA, &V_T);
+
+/*	printM(M, N, D);
+	printM(N, N, U);
+	printM(M, M, V_T);*/
+	printM(N, N, U);
+	printf("\n");
+	for(int i = 0; i < N; i++)
+		printf("%f\n", SIGMA[i]);
+	//printM(M, M, V_T);
+
 	PCA(retention, M, N, D, U, SIGMA, &D_HAT, &K);
 
 	end_time = omp_get_wtime();

@@ -18,7 +18,7 @@ for l in f:
 
 f.close()
 print (m,n)
-print a.T
+#print a.T
 print a.T.shape
 u, s, vh = np.linalg.svd(a.T, full_matrices=False)
 print u
